@@ -906,4 +906,493 @@
       <p>by OG Bar Beast · Miami</p>
     </div>
   </div>
-  <div style="display:flex; al
+  <div style="display:flex; align-items:center; gap:12px">
+    <button class="font-toggle" id="fontToggleBtn" onclick="toggleFont()" title="Switch between REPS brand style and professional clean style">
+      <span id="fontToggleIcon">🎨</span>
+      <span id="fontToggleLabel">Pro Style</span>
+    </button>
+    <div class="header-right">
+      EST. 2019 · <span>BUILT IN MIAMI</span>
+    </div>
+  </div>
+</header>
+
+<!-- Hero strip -->
+<div class="hero-strip">
+  <h2>
+    <span class="cyan">SCAN</span>
+    <span class="white"> ANY </span>
+    <span class="pink">DOCUMENT</span><br>
+    <span class="white">TRANSLATE </span>
+    <span class="cyan">INSTANTLY</span>
+  </h2>
+  <p>Camera · Upload · 43 Languages · 100% In-Browser</p>
+  <div class="hero-dots">
+    <span class="hl">Free</span>
+    <span>No Account Needed</span>
+    <span>No Wearable Needed</span>
+    <span class="hl">No BS</span>
+  </div>
+</div>
+
+<main>
+
+  <!-- ─── Step 1 ─── -->
+  <div class="step-label">
+    <div class="step-num">01</div>
+    <div class="step-info">
+      <h3>Capture Your Document</h3>
+      <p>Use camera or upload an image</p>
+    </div>
+    <div class="step-line"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('camera')" id="tab-camera">
+          📷 Live Camera
+        </button>
+        <button class="tab-btn" onclick="switchTab('upload')" id="tab-upload">
+          🖼 Upload Image
+        </button>
+      </div>
+
+      <!-- Camera panel -->
+      <div class="tab-panel active" id="panel-camera">
+        <div class="camera-wrap" id="cameraWrap">
+          <div class="cam-placeholder" id="camPlaceholder">
+            <span class="icon">📷</span>
+            <p>Camera Not Started</p>
+          </div>
+          <video id="videoEl" autoplay playsinline style="display:none"></video>
+          <div class="cam-overlay"><span></span></div>
+        </div>
+        <div class="cam-controls">
+          <button class="btn btn-cyan"       id="startCamBtn" onclick="startCamera()">▶ Start Camera</button>
+          <button class="btn btn-primary"    id="snapBtn"     onclick="capturePhoto()" disabled>📸 Capture</button>
+          <button class="btn btn-ghost-pink" id="stopCamBtn"  onclick="stopCamera()"   style="display:none">⏹ Stop</button>
+          <button class="btn btn-ghost"      id="flipBtn"     onclick="flipCamera()"   style="display:none">🔄 Flip</button>
+        </div>
+      </div>
+
+      <!-- Upload panel -->
+      <div class="tab-panel" id="panel-upload">
+        <div class="upload-area" id="uploadArea"
+             onclick="document.getElementById('fileInput').click()"
+             ondragover="onDragOver(event)" ondragleave="onDragLeave(event)"
+             ondrop="onDrop(event)">
+          <span class="icon">📁</span>
+          <p>Click to Choose or Drag &amp; Drop</p>
+          <span>PNG · JPG · WEBP · BMP · TIFF</span>
+        </div>
+        <input type="file" id="fileInput" accept="image/*" onchange="onFileSelected(event)" />
+      </div>
+
+      <!-- Preview -->
+      <div id="previewWrap">
+        <img id="previewImg" src="" alt="Captured document" />
+        <div class="preview-label" id="previewLabel">✓ Ready to Process</div>
+      </div>
+      <canvas id="captureCanvas"></canvas>
+    </div>
+  </div>
+
+  <!-- ─── Step 2 ─── -->
+  <div class="step-label">
+    <div class="step-num">02</div>
+    <div class="step-info">
+      <h3>Choose Language &amp; Extract</h3>
+      <p>Select target language, then run OCR + translation</p>
+    </div>
+    <div class="step-line"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <div class="lang-row">
+        <label>Translate To:</label>
+        <select id="langSelect">
+          <option value="es">🇪🇸 Spanish</option>
+          <option value="fr">🇫🇷 French</option>
+          <option value="de">🇩🇪 German</option>
+          <option value="it">🇮🇹 Italian</option>
+          <option value="pt">🇧🇷 Portuguese</option>
+          <option value="nl">🇳🇱 Dutch</option>
+          <option value="pl">🇵🇱 Polish</option>
+          <option value="ru">🇷🇺 Russian</option>
+          <option value="uk">🇺🇦 Ukrainian</option>
+          <option value="tr">🇹🇷 Turkish</option>
+          <option value="sv">🇸🇪 Swedish</option>
+          <option value="no">🇳🇴 Norwegian</option>
+          <option value="da">🇩🇰 Danish</option>
+          <option value="fi">🇫🇮 Finnish</option>
+          <option value="el">🇬🇷 Greek</option>
+          <option value="ro">🇷🇴 Romanian</option>
+          <option value="cs">🇨🇿 Czech</option>
+          <option value="sk">🇸🇰 Slovak</option>
+          <option value="hu">🇭🇺 Hungarian</option>
+          <option value="bg">🇧🇬 Bulgarian</option>
+          <option value="hr">🇭🇷 Croatian</option>
+          <option value="zh-CN">🇨🇳 Chinese (Simplified)</option>
+          <option value="zh-TW">🇹🇼 Chinese (Traditional)</option>
+          <option value="ja">🇯🇵 Japanese</option>
+          <option value="ko">🇰🇷 Korean</option>
+          <option value="ar">🇸🇦 Arabic</option>
+          <option value="he">🇮🇱 Hebrew</option>
+          <option value="fa">🇮🇷 Persian</option>
+          <option value="hi">🇮🇳 Hindi</option>
+          <option value="bn">🇧🇩 Bengali</option>
+          <option value="ta">🇮🇳 Tamil</option>
+          <option value="ur">🇵🇰 Urdu</option>
+          <option value="th">🇹🇭 Thai</option>
+          <option value="vi">🇻🇳 Vietnamese</option>
+          <option value="id">🇮🇩 Indonesian</option>
+          <option value="ms">🇲🇾 Malay</option>
+          <option value="tl">🇵🇭 Filipino</option>
+          <option value="sw">🇰🇪 Swahili</option>
+          <option value="af">🇿🇦 Afrikaans</option>
+          <option value="sq">🇦🇱 Albanian</option>
+          <option value="lv">🇱🇻 Latvian</option>
+          <option value="lt">🇱🇹 Lithuanian</option>
+          <option value="et">🇪🇪 Estonian</option>
+        </select>
+      </div>
+
+      <div class="process-btn-wrap">
+        <button class="btn btn-primary" id="processBtn" onclick="processDocument()" disabled>
+          ✦ Extract Text &amp; Translate
+        </button>
+      </div>
+
+      <div class="error-msg" id="errorMsg"></div>
+
+      <div id="progressWrap">
+        <div class="progress-label">
+          <span id="progressStatus">Starting…</span>
+          <span id="progressPct">0%</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="progressFill"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Step 3 ─── -->
+  <div id="resultsWrap">
+    <div class="step-label">
+      <div class="step-num">03</div>
+      <div class="step-info">
+        <h3>Results</h3>
+        <p>Original text + translation side by side</p>
+      </div>
+      <span class="badge-ok" style="margin-left:auto">✓ Done</span>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <div class="result-grid">
+          <div class="result-box">
+            <div class="result-box-label">
+              <span class="dot-cyan"></span> Original Extracted Text
+            </div>
+            <button class="copy-btn" onclick="copyText('ocrText', this)">Copy</button>
+            <textarea id="ocrText" placeholder="Extracted text will appear here…" readonly></textarea>
+          </div>
+          <div class="result-box">
+            <div class="result-box-label">
+              <span class="dot-pink"></span>
+              <span id="translatedLabel">Translated Text</span>
+            </div>
+            <button class="copy-btn" onclick="copyText('translatedText', this)">Copy</button>
+            <textarea id="translatedText" placeholder="Translation will appear here…" readonly></textarea>
+          </div>
+        </div>
+        <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap">
+          <button class="btn btn-ghost" onclick="resetAll()">🔄 Start Over</button>
+          <button class="btn btn-ghost" onclick="downloadResults()">💾 Download .txt</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Neon divider ─── -->
+  <div class="neon-divider" style="margin: 12px 0"></div>
+
+  <!-- ─── Business Inquiry Card ─── -->
+  <div class="inquiry-card">
+    <div class="inquiry-inner">
+      <div class="inquiry-text">
+        <div class="inquiry-eyebrow">⚡ Custom Development · OG Bar Beast</div>
+        <div class="inquiry-headline">
+          WANT THIS<br>
+          <span class="hl-pink">BUILT FOR</span><br>
+          <span class="hl-cyan">YOUR BUSINESS?</span>
+        </div>
+        <p class="inquiry-sub">
+          We build custom web apps, AI tools, and automation solutions tailored to your brand and workflow. Scan &amp; translate is just one of many products we can deliver — fast, clean, and production-ready.
+        </p>
+        <div class="inquiry-badges">
+          <span class="inquiry-badge active">Web Apps</span>
+          <span class="inquiry-badge active">AI Tools</span>
+          <span class="inquiry-badge">Mobile</span>
+          <span class="inquiry-badge">Automation</span>
+          <span class="inquiry-badge">Custom Branding</span>
+        </div>
+      </div>
+
+      <div class="inquiry-cta">
+        <a href="mailto:contact@ogbarbeast.com?subject=Custom App Inquiry&body=Hi, I'm interested in having a custom app built. Here's what I'm looking for:" class="btn btn-primary">
+          ✦ Get In Touch
+        </a>
+        <div class="inquiry-email">
+          <span>📧</span>
+          <span>Email us directly:</span>
+          <a href="mailto:contact@ogbarbeast.com">contact@ogbarbeast.com</a>
+        </div>
+        <div class="inquiry-email" style="margin-top:4px">
+          <span>🌐</span>
+          <span>Built by</span>
+          <a href="https://repsapp.ai" target="_blank" rel="noopener">repsapp.ai</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <p>
+    DocTranslate · Built by <a href="https://repsapp.ai" target="_blank" rel="noopener">OG Bar Beast</a> ·
+    Miami · Est. 2019 · You Are Your Best Investment
+  </p>
+</footer>
+
+<script>
+// ── Font toggle ──
+let proMode = false;
+function toggleFont() {
+  proMode = !proMode;
+  document.body.classList.toggle('pro-mode', proMode);
+  document.getElementById('fontToggleIcon').textContent  = proMode ? '✦' : '🎨';
+  document.getElementById('fontToggleLabel').textContent = proMode ? 'REPS Style' : 'Pro Style';
+}
+
+// ── State ──
+let stream = null;
+let capturedDataUrl = null;
+let facingMode = 'environment';
+const CHUNK_SIZE = 490;
+
+// ── Tab switching ──
+function switchTab(tab) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + tab).classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+  if (tab !== 'camera') stopCamera();
+}
+
+// ── Camera ──
+async function startCamera() {
+  hideError();
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: false
+    });
+    const video = document.getElementById('videoEl');
+    video.srcObject = stream;
+    video.style.display = 'block';
+    document.getElementById('camPlaceholder').style.display = 'none';
+    document.getElementById('startCamBtn').style.display = 'none';
+    document.getElementById('snapBtn').disabled = false;
+    document.getElementById('stopCamBtn').style.display = 'inline-flex';
+    document.getElementById('flipBtn').style.display = 'inline-flex';
+  } catch (e) {
+    showError('Camera access denied or unavailable. Please allow camera access and try again.');
+  }
+}
+
+function stopCamera() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  const video = document.getElementById('videoEl');
+  video.style.display = 'none';
+  video.srcObject = null;
+  document.getElementById('camPlaceholder').style.display = 'block';
+  document.getElementById('startCamBtn').style.display = 'inline-flex';
+  document.getElementById('snapBtn').disabled = true;
+  document.getElementById('stopCamBtn').style.display = 'none';
+  document.getElementById('flipBtn').style.display = 'none';
+}
+
+async function flipCamera() {
+  facingMode = facingMode === 'environment' ? 'user' : 'environment';
+  stopCamera();
+  await startCamera();
+}
+
+function capturePhoto() {
+  const video = document.getElementById('videoEl');
+  const canvas = document.getElementById('captureCanvas');
+  canvas.width  = video.videoWidth  || 1280;
+  canvas.height = video.videoHeight || 720;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  capturedDataUrl = canvas.toDataURL('image/png');
+  showPreview(capturedDataUrl, '✓ Photo Captured — Ready to Process');
+  document.getElementById('processBtn').disabled = false;
+}
+
+// ── Upload ──
+function onFileSelected(e) { const f = e.target.files[0]; if (f) loadFile(f); }
+function onDragOver(e)  { e.preventDefault(); document.getElementById('uploadArea').classList.add('dragover'); }
+function onDragLeave()  { document.getElementById('uploadArea').classList.remove('dragover'); }
+function onDrop(e)      { e.preventDefault(); onDragLeave(); const f = e.dataTransfer.files[0]; if (f) loadFile(f); }
+
+function loadFile(file) {
+  if (!file.type.startsWith('image/')) { showError('Please select a valid image file.'); return; }
+  const reader = new FileReader();
+  reader.onload = ev => {
+    capturedDataUrl = ev.target.result;
+    showPreview(capturedDataUrl, `✓ Loaded: ${file.name}`);
+    document.getElementById('processBtn').disabled = false;
+    hideError();
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── Preview ──
+function showPreview(dataUrl, label) {
+  document.getElementById('previewImg').src = dataUrl;
+  document.getElementById('previewLabel').textContent = label;
+  document.getElementById('previewWrap').style.display = 'block';
+}
+
+// ── Main: OCR + Translate ──
+async function processDocument() {
+  if (!capturedDataUrl) { showError('Please capture or upload a photo first.'); return; }
+  hideError();
+  document.getElementById('processBtn').disabled = true;
+  document.getElementById('resultsWrap').style.display = 'none';
+  showProgress('Initializing OCR Engine…', 0);
+
+  try {
+    const result = await Tesseract.recognize(capturedDataUrl, 'eng', {
+      logger: m => {
+        if (m.status === 'recognizing text')          updateProgress(`Recognizing Text… ${Math.round(m.progress*70)}%`, Math.round(m.progress*70));
+        else if (m.status === 'loading tesseract core')  updateProgress('Loading OCR Engine…', 5);
+        else if (m.status === 'initializing tesseract')  updateProgress('Initializing…', 10);
+        else if (m.status === 'loading language traineddata') updateProgress('Loading Language Data…', 20);
+      }
+    });
+    const extractedText = result.data.text.trim();
+    if (!extractedText) {
+      hideProgress();
+      showError('No text detected. Try a clearer photo with better lighting.');
+      document.getElementById('processBtn').disabled = false;
+      return;
+    }
+    document.getElementById('ocrText').value = extractedText;
+    updateProgress('Translating…', 75);
+
+    const langCode = document.getElementById('langSelect').value;
+    const langName = document.getElementById('langSelect').selectedOptions[0].text.replace(/^\S+\s/, '');
+    const translated = await translateText(extractedText, langCode);
+    updateProgress('Complete!', 100);
+
+    document.getElementById('translatedText').value = translated;
+    document.getElementById('translatedLabel').textContent = `Translated → ${langName}`;
+    document.getElementById('resultsWrap').style.display = 'block';
+    document.getElementById('resultsWrap').scrollIntoView({ behavior: 'smooth' });
+    setTimeout(hideProgress, 1000);
+  } catch (err) {
+    hideProgress();
+    showError('Something went wrong: ' + err.message);
+  } finally {
+    document.getElementById('processBtn').disabled = false;
+  }
+}
+
+// ── Translation ──
+async function translateText(text, targetLang) {
+  const chunks = chunkText(text, CHUNK_SIZE);
+  const results = [];
+  for (let i = 0; i < chunks.length; i++) {
+    updateProgress(`Translating Chunk ${i+1}/${chunks.length}…`, 75 + Math.round((i/chunks.length)*22));
+    results.push(await translateChunk(chunks[i], 'en', targetLang));
+  }
+  return results.join(' ');
+}
+
+async function translateChunk(text, from, to) {
+  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${encodeURIComponent(from+'|'+to)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Translation API error: ${res.status}`);
+  const data = await res.json();
+  if (data.responseStatus === 200) return data.responseData.translatedText;
+  if (data.matches?.length) return data.matches[0].translation;
+  throw new Error('Translation failed: ' + (data.responseDetails || 'Unknown error'));
+}
+
+function chunkText(text, size) {
+  const words = text.split(/\s+/);
+  const chunks = []; let current = '';
+  for (const word of words) {
+    if ((current + ' ' + word).trim().length > size) { if (current) chunks.push(current.trim()); current = word; }
+    else current = (current + ' ' + word).trim();
+  }
+  if (current) chunks.push(current.trim());
+  return chunks.length ? chunks : [text.slice(0, size)];
+}
+
+// ── Progress ──
+function showProgress(msg, pct) { document.getElementById('progressWrap').style.display = 'block'; updateProgress(msg, pct); }
+function updateProgress(msg, pct) {
+  document.getElementById('progressStatus').textContent = msg;
+  document.getElementById('progressPct').textContent = pct + '%';
+  document.getElementById('progressFill').style.width = pct + '%';
+}
+function hideProgress() { document.getElementById('progressWrap').style.display = 'none'; }
+
+// ── Error ──
+function showError(msg) { const e = document.getElementById('errorMsg'); e.textContent = '⚠ ' + msg; e.style.display = 'block'; }
+function hideError()    { document.getElementById('errorMsg').style.display = 'none'; }
+
+// ── Copy ──
+async function copyText(id, btn) {
+  try {
+    await navigator.clipboard.writeText(document.getElementById(id).value);
+    btn.textContent = '✓ Copied'; btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  } catch { document.getElementById(id).select(); document.execCommand('copy'); }
+}
+
+// ── Download ──
+function downloadResults() {
+  const orig  = document.getElementById('ocrText').value;
+  const trans = document.getElementById('translatedText').value;
+  const lang  = document.getElementById('langSelect').selectedOptions[0].text.replace(/^\S+\s/, '');
+  const content = `DocTranslate — OG Bar Beast\n${'='.repeat(40)}\n\nORIGINAL TEXT:\n${orig}\n\n${'='.repeat(40)}\n\nTRANSLATED (${lang}):\n${trans}\n\n${'─'.repeat(40)}\nrepsapp.ai · contact@ogbarbeast.com`;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], { type: 'text/plain' }));
+  a.download = 'doctranslate_result.txt';
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+// ── Reset ──
+function resetAll() {
+  capturedDataUrl = null; stopCamera();
+  document.getElementById('previewWrap').style.display = 'none';
+  document.getElementById('previewImg').src = '';
+  document.getElementById('ocrText').value = '';
+  document.getElementById('translatedText').value = '';
+  document.getElementById('resultsWrap').style.display = 'none';
+  document.getElementById('processBtn').disabled = true;
+  document.getElementById('fileInput').value = '';
+  hideError(); hideProgress();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+</body>
+</html>
