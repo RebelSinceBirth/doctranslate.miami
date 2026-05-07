@@ -336,9 +336,23 @@
     .cam-controls {
       margin-top: 14px;
       display: flex;
-      gap: 10px;
+      gap: 8px;
       flex-wrap: wrap;
+      align-items: center;
     }
+    .cam-controls .btn {
+      flex: 0 0 auto;
+      padding: 10px 16px;
+      font-size: 0.82rem;
+    }
+    .btn-orient {
+      background: var(--surface3);
+      color: var(--cyan);
+      border: 1px solid rgba(0,212,255,.35);
+      font-size: 0.82rem;
+    }
+    .btn-orient:hover:not(:disabled) { background: var(--cyan-dim); border-color: var(--cyan); }
+    .btn-orient.portrait-active { color: var(--pink); border-color: rgba(255,26,109,.4); background: var(--pink-dim); }
 
     /* ── Upload ── */
     .upload-area {
@@ -887,7 +901,8 @@
     /* ── Responsive ── */
     @media (max-width: 500px) {
       .header-right { display: none; }
-      .cam-controls  { flex-direction: column; }
+      .cam-controls  { flex-wrap: wrap; }
+      .cam-controls .btn { flex: 1 1 auto; min-width: 0; justify-content: center; }
       .lang-row      { flex-direction: column; align-items: stretch; }
       .inquiry-inner { padding: 24px 20px; }
     }
@@ -969,10 +984,11 @@
           <div class="cam-overlay"><span></span></div>
         </div>
         <div class="cam-controls">
-          <button class="btn btn-cyan"       id="startCamBtn" onclick="startCamera()">▶ Start Camera</button>
-          <button class="btn btn-primary"    id="snapBtn"     onclick="capturePhoto()" disabled>📸 Capture</button>
-          <button class="btn btn-ghost-pink" id="stopCamBtn"  onclick="stopCamera()"   style="display:none">⏹ Stop</button>
-          <button class="btn btn-ghost"      id="flipBtn"     onclick="flipCamera()"   style="display:none">🔄 Flip</button>
+          <button class="btn btn-cyan"       id="startCamBtn"  onclick="startCamera()">▶ Start Camera</button>
+          <button class="btn btn-primary"    id="snapBtn"      onclick="capturePhoto()" disabled>📸 Capture</button>
+          <button class="btn btn-ghost-pink" id="stopCamBtn"   onclick="stopCamera()"   style="display:none">⏹ Stop</button>
+          <button class="btn btn-ghost"      id="flipBtn"      onclick="flipCamera()"   style="display:none">🔄 Flip</button>
+          <button class="btn btn-orient"     id="orientBtn"    onclick="toggleOrientation()" title="Switch portrait / landscape">📐 Landscape</button>
         </div>
       </div>
 
@@ -1183,7 +1199,28 @@ function toggleFont() {
 let stream = null;
 let capturedDataUrl = null;
 let facingMode = 'environment';
+let orientMode = 'landscape'; // 'landscape' | 'portrait'
 const CHUNK_SIZE = 490;
+
+// ── Orientation toggle ──
+function toggleOrientation() {
+  orientMode = orientMode === 'landscape' ? 'portrait' : 'landscape';
+  const btn = document.getElementById('orientBtn');
+  const wrap = document.getElementById('cameraWrap');
+  if (orientMode === 'portrait') {
+    btn.textContent = '📐 Portrait';
+    btn.classList.add('portrait-active');
+    wrap.style.aspectRatio = '9/16';
+    wrap.style.maxHeight = '70vh';
+  } else {
+    btn.textContent = '📐 Landscape';
+    btn.classList.remove('portrait-active');
+    wrap.style.aspectRatio = '16/9';
+    wrap.style.maxHeight = '';
+  }
+  // Restart camera if running to apply new constraints
+  if (stream) { stopCamera(); startCamera(); }
+}
 
 // ── Tab switching ──
 function switchTab(tab) {
@@ -1198,8 +1235,13 @@ function switchTab(tab) {
 async function startCamera() {
   hideError();
   try {
+    const isPortrait = orientMode === 'portrait';
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      video: {
+        facingMode,
+        width:  { ideal: isPortrait ? 1080 : 1920 },
+        height: { ideal: isPortrait ? 1920 : 1080 }
+      },
       audio: false
     });
     const video = document.getElementById('videoEl');
@@ -1239,7 +1281,7 @@ function capturePhoto() {
   canvas.width  = video.videoWidth  || 1280;
   canvas.height = video.videoHeight || 720;
   canvas.getContext('2d').drawImage(video, 0, 0);
-  capturedDataUrl = canvas.toDataURL('image/png');
+  capturedDataUrl = preprocessImage(canvas);
   showPreview(capturedDataUrl, '✓ Photo Captured — Ready to Process');
   document.getElementById('processBtn').disabled = false;
 }
@@ -1254,12 +1296,40 @@ function loadFile(file) {
   if (!file.type.startsWith('image/')) { showError('Please select a valid image file.'); return; }
   const reader = new FileReader();
   reader.onload = ev => {
-    capturedDataUrl = ev.target.result;
-    showPreview(capturedDataUrl, `✓ Loaded: ${file.name}`);
-    document.getElementById('processBtn').disabled = false;
-    hideError();
+    // Preprocess uploaded image too
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.getElementById('captureCanvas');
+      canvas.width  = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      capturedDataUrl = preprocessImage(canvas);
+      showPreview(capturedDataUrl, `✓ Loaded: ${file.name}`);
+      document.getElementById('processBtn').disabled = false;
+      hideError();
+    };
+    img.src = ev.target.result;
   };
   reader.readAsDataURL(file);
+}
+
+// ── Image preprocessing — grayscale + contrast boost for better OCR ──
+function preprocessImage(canvas) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  const imgData = ctx.getImageData(0, 0, w, h);
+  const d = imgData.data;
+
+  for (let i = 0; i < d.length; i += 4) {
+    // Convert to grayscale using luminance weights
+    const gray = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
+    // Contrast boost: stretch towards black/white
+    const contrast = 1.5;
+    const boosted = Math.min(255, Math.max(0, contrast * (gray - 128) + 128));
+    d[i] = d[i+1] = d[i+2] = boosted;
+  }
+  ctx.putImageData(imgData, 0, 0);
+  return canvas.toDataURL('image/png');
 }
 
 // ── Preview ──
@@ -1280,11 +1350,16 @@ async function processDocument() {
   try {
     const result = await Tesseract.recognize(capturedDataUrl, 'eng', {
       logger: m => {
-        if (m.status === 'recognizing text')          updateProgress(`Recognizing Text… ${Math.round(m.progress*70)}%`, Math.round(m.progress*70));
-        else if (m.status === 'loading tesseract core')  updateProgress('Loading OCR Engine…', 5);
-        else if (m.status === 'initializing tesseract')  updateProgress('Initializing…', 10);
+        if (m.status === 'recognizing text')               updateProgress(`Recognizing Text… ${Math.round(m.progress*70)}%`, Math.round(m.progress*70));
+        else if (m.status === 'loading tesseract core')    updateProgress('Loading OCR Engine…', 5);
+        else if (m.status === 'initializing tesseract')    updateProgress('Initializing…', 10);
         else if (m.status === 'loading language traineddata') updateProgress('Loading Language Data…', 20);
-      }
+      },
+      // PSM 6 = assume single uniform block of text (better for printed docs/bills)
+      // OEM 1 = LSTM neural net engine (most accurate)
+      tessedit_pageseg_mode: '6',
+      tessedit_ocr_engine_mode: '1',
+      preserve_interword_spaces: '1',
     });
     const extractedText = result.data.text.trim();
     if (!extractedText) {
@@ -1373,9 +1448,11 @@ function downloadResults() {
   const orig  = document.getElementById('ocrText').value;
   const trans = document.getElementById('translatedText').value;
   const lang  = document.getElementById('langSelect').selectedOptions[0].text.replace(/^\S+\s/, '');
-  const content = `DocTranslate — OG Bar Beast\n${'='.repeat(40)}\n\nORIGINAL TEXT:\n${orig}\n\n${'='.repeat(40)}\n\nTRANSLATED (${lang}):\n${trans}\n\n${'─'.repeat(40)}\nrepsapp.ai · contact@ogbarbeast.com`;
+  const content = `DocTranslate - OG Bar Beast\n${'='.repeat(40)}\n\nORIGINAL TEXT:\n${orig}\n\n${'='.repeat(40)}\n\nTRANSLATED (${lang}):\n${trans}\n\n${'='.repeat(40)}\nrepsapp.ai - contact@ogbarbeast.com`;
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([content], { type: 'text/plain' }));
+  // Use UTF-8 BOM so special characters render correctly on all devices
+  const bom = '﻿';
+  a.href = URL.createObjectURL(new Blob([bom + content], { type: 'text/plain;charset=utf-8' }));
   a.download = 'doctranslate_result.txt';
   a.click(); URL.revokeObjectURL(a.href);
 }
