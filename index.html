@@ -1450,10 +1450,11 @@ function htmlToStructuredText(html) {
 function cleanOCRText(text) {
   const lines = text.split('\n').map(line => {
 
-    // 1. Zero-gram artifacts: [o]], [o], o], [0] → 0g
-    line = line.replace(/\[o\]\]?/g, '0g');
+    // 1. Zero-gram artifacts: [o]], [o], [oJ], [oJ]], o], [0] → 0g
+    line = line.replace(/\[o[Jj]?\]?\]?/g, '0g');
     line = line.replace(/\bo\]\]?(?=\s|$)/g, '0g');
     line = line.replace(/\[0\](?=\s|$)/g, '0g');
+    line = line.replace(/\[O[Jj]?\]?\]?/g, '0g'); // uppercase O variant
 
     // 2. Cent symbol in gram measurements: 5¢g → 5g, 5¢ → 5g
     line = line.replace(/(\d+)¢g?\b/g, '$1g');
