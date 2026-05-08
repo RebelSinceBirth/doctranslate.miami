@@ -1355,8 +1355,12 @@ function cleanOCRText(text) {
     .filter(line => {
       const t = line.trim();
       if (!t) return true; // keep blank lines for spacing
-      if (/^[-=_—~•·\s]{3,}$/.test(t)) return false; // pure decoration
+      if (/^[-=_—~•·\s]{3,}$/.test(t)) return false;  // pure dashes/symbols
+      if (/^[A-Za-z]{0,2}[\s]*[-—=_]{3,}/.test(t)) return false; // "L ———" style noise
       if (t.length <= 2 && !/^\d+$/.test(t)) return false; // very short noise
+      // Remove lines that are >60% non-alphanumeric (decorative artifacts)
+      const alphaNum = (t.match(/[a-zA-Z0-9]/g) || []).length;
+      if (t.length > 4 && alphaNum / t.length < 0.3) return false;
       return true;
     })
     .join('\n')
@@ -1444,39 +1448,51 @@ async function processDocument() {
 }
 
 // ── Language code normalizer for Google Translate ──
-// Maps display codes to Google Translate supported codes
 const LANG_CODE_MAP = {
-  'es-419': 'es',   // Latin America → es (Google's Spanish is LatAm-neutral)
+  'es-419': 'es',
   'es-MX':  'es',
   'es-CO':  'es',
   'es-AR':  'es',
 };
 function apiLangCode(code) {
-  return LANG_CODE_MAP[code] !== undefined ? LANG_CODE_MAP[code] : code;
+  return LANG_CODE_MAP[code] ?? code;
 }
 
-// ── Translation — Google Translate (free, no API key, 5000 char/request) ──
+// ── Translation — Google Translate (free, no API key) ──
 async function translateText(text, targetLang) {
   const code = apiLangCode(targetLang);
   const chunks = chunkText(text, CHUNK_SIZE);
   const results = [];
   for (let i = 0; i < chunks.length; i++) {
-    updateProgress(`Translating${chunks.length > 1 ? ` Part ${i+1}/${chunks.length}` : ''}…`, 75 + Math.round((i/chunks.length)*22));
+    const label = chunks.length > 1 ? ` Part ${i+1}/${chunks.length}` : '';
+    updateProgress(`Translating${label}…`, 75 + Math.round((i / chunks.length) * 22));
     results.push(await translateChunk(chunks[i], 'en', code));
   }
-  return results.join(' ');
+  // Join with newline so paragraph/line structure is preserved
+  return results.join('\n');
 }
 
 async function translateChunk(text, from, to) {
-  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(from)}&tl=${encodeURIComponent(to)}&dt=t&q=${encodeURIComponent(text)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Translation error: ${res.status}`);
-  const data = await res.json();
-  // Google returns nested array: data[0] = [[translated, original, ...], ...]
-  if (data && data[0]) {
-    return data[0].map(segment => segment[0] || '').join('');
+  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${from}&tl=${to}&dt=t&q=${encodeURIComponent(text)}`;
+  let res;
+  try {
+    res = await fetch(url);
+  } catch (netErr) {
+    throw new Error('Network error reaching translation service. Check your connection.');
   }
-  throw new Error('Translation failed — check your connection and try again.');
+  if (!res.ok) throw new Error(`Translation service returned ${res.status}`);
+
+  const data = await res.json();
+
+  // Google response: [ [ ["translated seg","original seg",...], ... ], null, "detected_lang", ... ]
+  if (data && Array.isArray(data[0])) {
+    const translated = data[0]
+      .filter(seg => Array.isArray(seg) && typeof seg[0] === 'string')
+      .map(seg => seg[0])
+      .join('');
+    if (translated.trim()) return translated;
+  }
+  throw new Error('Empty response from translation service — try again.');
 }
 
 function chunkText(text, size) {
