@@ -1029,7 +1029,11 @@
       <div class="lang-row">
         <label>Translate To:</label>
         <select id="langSelect">
-          <option value="es">🇪🇸 Spanish</option>
+          <option value="es-419">🌎 Spanish (Latin America)</option>
+          <option value="es-MX">🇲🇽 Spanish (Mexico)</option>
+          <option value="es-CO">🇨🇴 Spanish (Colombia)</option>
+          <option value="es-AR">🇦🇷 Spanish (Argentina)</option>
+          <option value="es">🇪🇸 Spanish (Spain)</option>
           <option value="fr">🇫🇷 French</option>
           <option value="de">🇩🇪 German</option>
           <option value="it">🇮🇹 Italian</option>
@@ -1313,6 +1317,53 @@ function loadFile(file) {
   reader.readAsDataURL(file);
 }
 
+// ── OCR post-processing — fix common misreads ──
+function cleanOCRText(text) {
+  const lines = text.split('\n').map(line => {
+
+    // 1. Zero-gram artifacts: [o]], [o], o], [0] → 0g
+    line = line.replace(/\[o\]\]?/g, '0g');
+    line = line.replace(/\bo\]\]?(?=\s|$)/g, '0g');
+    line = line.replace(/\[0\](?=\s|$)/g, '0g');
+
+    // 2. Cent symbol in gram measurements: 5¢g → 5g, 5¢ → 5g
+    line = line.replace(/(\d+)¢g?\b/g, '$1g');
+
+    // 3. Lowercase-L misread as 1 before digits: l4g → 14g
+    line = line.replace(/\bl(\d)/g, '1$1');
+
+    // 4. Common OCR word errors
+    line = line.replace(/\bIltem\b/gi, 'Item');
+    line = line.replace(/\bItern\b/gi, 'Item');
+
+    // 5. Strip leading bracket+digit section header artifacts: "[1 CROISSANT" → "CROISSANT"
+    line = line.replace(/^\s*\[?\d\s+(?=[A-Z]{2})/g, '');
+
+    // 6. Context-aware g→9 fix for macro/nutrition table rows
+    // If a line has 3+ numeric tokens, treat it as a data row and fix trailing 9 → g
+    const tokens = line.trim().split(/\s+/);
+    const numericLike = tokens.filter(t => /^\d{1,4}[g9]?$/.test(t));
+    if (tokens.length >= 3 && numericLike.length >= 3) {
+      line = line.replace(/\b(\d{1,4})9\b/g, '$1g');
+    }
+
+    return line;
+  });
+
+  // Remove obvious decorative/noise-only lines
+  return lines
+    .filter(line => {
+      const t = line.trim();
+      if (!t) return true; // keep blank lines for spacing
+      if (/^[-=_—~•·\s]{3,}$/.test(t)) return false; // pure decoration
+      if (t.length <= 2 && !/^\d+$/.test(t)) return false; // very short noise
+      return true;
+    })
+    .join('\n')
+    .replace(/  +/g, ' ')
+    .trim();
+}
+
 // ── Image preprocessing — grayscale + contrast boost for better OCR ──
 function preprocessImage(canvas) {
   const ctx = canvas.getContext('2d');
@@ -1361,13 +1412,14 @@ async function processDocument() {
       tessedit_ocr_engine_mode: '1',
       preserve_interword_spaces: '1',
     });
-    const extractedText = result.data.text.trim();
-    if (!extractedText) {
+    const rawText = result.data.text.trim();
+    if (!rawText) {
       hideProgress();
       showError('No text detected. Try a clearer photo with better lighting.');
       document.getElementById('processBtn').disabled = false;
       return;
     }
+    const extractedText = cleanOCRText(rawText);
     document.getElementById('ocrText').value = extractedText;
     updateProgress('Translating…', 75);
 
