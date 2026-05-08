@@ -31,7 +31,7 @@
   <!-- ── Theme color (mobile browser chrome) ── -->
   <meta name="theme-color" content="#ff1a6d" />
 
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js"></script>
+  <script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -1673,11 +1673,6 @@ async function processDocument() {
         else if (m.status === 'initializing tesseract')       updateProgress('Initializing…', 10);
         else if (m.status === 'loading language traineddata') updateProgress('Loading Language Data…', 20);
       },
-      // PSM 6 = single uniform text block (best for printed docs/labels)
-      // OEM 1 = LSTM neural net engine (most accurate)
-      tessedit_pageseg_mode: '6',
-      tessedit_ocr_engine_mode: '1',
-      preserve_interword_spaces: '1',
     });
     const rawText = result.data.text.trim();
     if (!rawText) {
