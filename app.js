@@ -58,8 +58,8 @@ async function startCamera() {
     stream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode,
-        width:  { ideal: isPortrait ? 1080 : 1920 },
-        height: { ideal: isPortrait ? 1920 : 1080 }
+        aspectRatio: { ideal: isPortrait ? 9/16 : 16/9 },
+        // No explicit width/height — lets camera use full natural FOV without digital crop/zoom
       },
       audio: false
     });
