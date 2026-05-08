@@ -1465,6 +1465,9 @@ function cleanOCRText(text) {
     // 4. Common OCR word errors
     line = line.replace(/\bIltem\b/gi, 'Item');
     line = line.replace(/\bItern\b/gi, 'Item');
+    line = line.replace(/\bcallfel\b/gi, 'cal');   // "callfel" → "cal"
+    line = line.replace(/\bcallfei\b/gi, 'cal');   // alternate garble
+    line = line.replace(/«\s*/g, '');              // stray « guillemet noise
 
     // 5. Strip leading bracket+digit section header artifacts: "[1 CROISSANT" → "CROISSANT"
     line = line.replace(/^\s*\[?\d\s+(?=[A-Z]{2})/g, '');
@@ -1474,7 +1477,9 @@ function cleanOCRText(text) {
     const tokens = line.trim().split(/\s+/);
     const numericLike = tokens.filter(t => /^\d{1,4}[g9]?$/.test(t));
     if (tokens.length >= 3 && numericLike.length >= 3) {
-      line = line.replace(/\b(\d{1,4})9\b/g, '$1g');
+      line = line.replace(/\b(\d{1,4})9\b/g, '$1g');        // 9 at end → g (no existing g)
+      line = line.replace(/\b(\d{1,2})9g\b/g, '$1g');       // X9g → Xg  (e.g. 69g→6g, 59g→5g)
+      line = line.replace(/\b(\d{2,3})9g\b/g, '$1g');       // XX9g → XXg (e.g. 129g→12g)
     }
 
     return line;
