@@ -1441,13 +1441,25 @@ async function processDocument() {
   }
 }
 
+// ── Language code normalizer ──
+// MyMemory doesn't support all regional codes — map them to supported equivalents
+const LANG_CODE_MAP = {
+  'es-419': 'es-MX', // Latin America → Mexican Spanish (largest LatAm variant, fully supported)
+  'zh-CN':  'zh',    // Simplified Chinese
+  'zh-TW':  'zh-TW',
+};
+function apiLangCode(code) {
+  return LANG_CODE_MAP[code] !== undefined ? LANG_CODE_MAP[code] : code;
+}
+
 // ── Translation ──
 async function translateText(text, targetLang) {
+  const code = apiLangCode(targetLang);
   const chunks = chunkText(text, CHUNK_SIZE);
   const results = [];
   for (let i = 0; i < chunks.length; i++) {
     updateProgress(`Translating Chunk ${i+1}/${chunks.length}…`, 75 + Math.round((i/chunks.length)*22));
-    results.push(await translateChunk(chunks[i], 'en', targetLang));
+    results.push(await translateChunk(chunks[i], 'en', code));
   }
   return results.join(' ');
 }
@@ -1457,9 +1469,35 @@ async function translateChunk(text, from, to) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Translation API error: ${res.status}`);
   const data = await res.json();
-  if (data.responseStatus === 200) return data.responseData.translatedText;
-  if (data.matches?.length) return data.matches[0].translation;
-  throw new Error('Translation failed: ' + (data.responseDetails || 'Unknown error'));
+
+  let result = null;
+  if (data.responseStatus === 200) {
+    result = data.responseData.translatedText;
+  } else if (data.matches?.length) {
+    result = data.matches[0].translation;
+  }
+
+  // Detect failed translation: API returned original English text or a warning message
+  if (!result
+    || result.trim().toLowerCase() === text.trim().toLowerCase()
+    || result.startsWith('MYMEMORY WARNING')
+    || result.startsWith('PLEASE SELECT')) {
+    // Retry once with base language code (strip region suffix)
+    const baseLang = to.split('-')[0];
+    if (baseLang !== to) {
+      const retryUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${encodeURIComponent(from+'|'+baseLang)}`;
+      const retryRes = await fetch(retryUrl);
+      const retryData = await retryRes.json();
+      if (retryData.responseStatus === 200) {
+        result = retryData.responseData.translatedText;
+      }
+    }
+  }
+
+  if (!result || result.startsWith('MYMEMORY WARNING')) {
+    throw new Error('Translation failed — try again or check your connection.');
+  }
+  return result;
 }
 
 function chunkText(text, size) {
