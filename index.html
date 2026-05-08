@@ -31,7 +31,7 @@
   <!-- ── Theme color (mobile browser chrome) ── -->
   <meta name="theme-color" content="#ff1a6d" />
 
-  <script src="https://unpkg.com/tesseract.js@4/dist/tesseract.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -1204,7 +1204,7 @@ let stream = null;
 let capturedDataUrl = null;
 let facingMode = 'environment';
 let orientMode = 'landscape'; // 'landscape' | 'portrait'
-const CHUNK_SIZE = 490;
+const CHUNK_SIZE = 4500; // Google Translate handles up to 5000 chars per request
 
 // ── Orientation toggle ──
 function toggleOrientation() {
@@ -1401,12 +1401,14 @@ async function processDocument() {
   try {
     const result = await Tesseract.recognize(capturedDataUrl, 'eng', {
       logger: m => {
-        if (m.status === 'recognizing text')               updateProgress(`Recognizing Text… ${Math.round(m.progress*70)}%`, Math.round(m.progress*70));
-        else if (m.status === 'loading tesseract core')    updateProgress('Loading OCR Engine…', 5);
-        else if (m.status === 'initializing tesseract')    updateProgress('Initializing…', 10);
+        if (m.status === 'recognizing text')                  updateProgress(`Recognizing Text… ${Math.round(m.progress*70)}%`, Math.round(m.progress*70));
+        else if (m.status === 'loading tesseract core')       updateProgress('Loading OCR Engine…', 5);
+        else if (m.status === 'initializing tesseract')       updateProgress('Initializing…', 10);
         else if (m.status === 'loading language traineddata') updateProgress('Loading Language Data…', 20);
       },
-      // PSM 6 = assume single uniform block of text (better for printed docs/bills)
+      // Force non-SIMD LSTM core — fixes WASM crash on mobile & certain browsers
+      corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@4.0.4/tesseract-core-lstm.wasm.js',
+      // PSM 6 = single uniform text block (best for printed docs/labels)
       // OEM 1 = LSTM neural net engine (most accurate)
       tessedit_pageseg_mode: '6',
       tessedit_ocr_engine_mode: '1',
@@ -1441,63 +1443,40 @@ async function processDocument() {
   }
 }
 
-// ── Language code normalizer ──
-// MyMemory doesn't support all regional codes — map them to supported equivalents
+// ── Language code normalizer for Google Translate ──
+// Maps display codes to Google Translate supported codes
 const LANG_CODE_MAP = {
-  'es-419': 'es-MX', // Latin America → Mexican Spanish (largest LatAm variant, fully supported)
-  'zh-CN':  'zh',    // Simplified Chinese
-  'zh-TW':  'zh-TW',
+  'es-419': 'es',   // Latin America → es (Google's Spanish is LatAm-neutral)
+  'es-MX':  'es',
+  'es-CO':  'es',
+  'es-AR':  'es',
 };
 function apiLangCode(code) {
   return LANG_CODE_MAP[code] !== undefined ? LANG_CODE_MAP[code] : code;
 }
 
-// ── Translation ──
+// ── Translation — Google Translate (free, no API key, 5000 char/request) ──
 async function translateText(text, targetLang) {
   const code = apiLangCode(targetLang);
   const chunks = chunkText(text, CHUNK_SIZE);
   const results = [];
   for (let i = 0; i < chunks.length; i++) {
-    updateProgress(`Translating Chunk ${i+1}/${chunks.length}…`, 75 + Math.round((i/chunks.length)*22));
+    updateProgress(`Translating${chunks.length > 1 ? ` Part ${i+1}/${chunks.length}` : ''}…`, 75 + Math.round((i/chunks.length)*22));
     results.push(await translateChunk(chunks[i], 'en', code));
   }
   return results.join(' ');
 }
 
 async function translateChunk(text, from, to) {
-  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${encodeURIComponent(from+'|'+to)}`;
+  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(from)}&tl=${encodeURIComponent(to)}&dt=t&q=${encodeURIComponent(text)}`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`Translation API error: ${res.status}`);
+  if (!res.ok) throw new Error(`Translation error: ${res.status}`);
   const data = await res.json();
-
-  let result = null;
-  if (data.responseStatus === 200) {
-    result = data.responseData.translatedText;
-  } else if (data.matches?.length) {
-    result = data.matches[0].translation;
+  // Google returns nested array: data[0] = [[translated, original, ...], ...]
+  if (data && data[0]) {
+    return data[0].map(segment => segment[0] || '').join('');
   }
-
-  // Detect failed translation: API returned original English text or a warning message
-  if (!result
-    || result.trim().toLowerCase() === text.trim().toLowerCase()
-    || result.startsWith('MYMEMORY WARNING')
-    || result.startsWith('PLEASE SELECT')) {
-    // Retry once with base language code (strip region suffix)
-    const baseLang = to.split('-')[0];
-    if (baseLang !== to) {
-      const retryUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${encodeURIComponent(from+'|'+baseLang)}`;
-      const retryRes = await fetch(retryUrl);
-      const retryData = await retryRes.json();
-      if (retryData.responseStatus === 200) {
-        result = retryData.responseData.translatedText;
-      }
-    }
-  }
-
-  if (!result || result.startsWith('MYMEMORY WARNING')) {
-    throw new Error('Translation failed — try again or check your connection.');
-  }
-  return result;
+  throw new Error('Translation failed — check your connection and try again.');
 }
 
 function chunkText(text, size) {
