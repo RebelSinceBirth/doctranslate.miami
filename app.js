@@ -282,8 +282,38 @@ function cleanOCRText(text) {
       line = line.replace(/\b(\d{2,3})9g\b/g, '$1g');       // XX9g → XXg (e.g. 129g→12g)
     }
 
+    // 7. Dollar sign / price fixes
+    line = line.replace(/\bS(\d{1,4}(?:[.,]\d{2})?)\b/g, '\$$1');   // S24.99 → $24.99, S100 → $100
+    line = line.replace(/\b5(\d{2,3}(?:\.\d{2})?)\b(?=\s|$)/g, (m, n) => {
+      // Only treat leading 5 as $ when it looks like a price (e.g. 524.99 → $24.99)
+      return '\$' + n;
+    });
+    line = line.replace(/\$\s+(\d)/g, '\$$1');                        // $ 24 → $24 (space after $)
+    line = line.replace(/(\$\d+)\s(\d{2})(?=\s|$)/g, '$1.$2');       // $24 99 → $24.99
+    line = line.replace(/(\d{1,3})\s(\d{3})(?=\s|$)/g, '$1$2');      // 1 000 → 1000 (spaced thousands)
+
+    // 8. Letter O / zero confusion inside numbers
+    line = line.replace(/(\d)[Oo](\d)/g, (_, a, b) => a + '0' + b);  // 1O0 → 100, 2o5 → 205
+
     return line;
   });
+
+  // 9. Sequential number gap repair — fixes "Day 1" when it should be "Day 11"
+  // Detects numbered list/table rows and repairs gaps in the sequence
+  const numberedRows = [];
+  lines.forEach((line, i) => {
+    const m = line.trimStart().match(/^(\d{1,3})(\s+\S)/);
+    if (m) numberedRows.push({ i, num: parseInt(m[1]) });
+  });
+  for (let r = 1; r < numberedRows.length - 1; r++) {
+    const prev = numberedRows[r - 1].num;
+    const curr = numberedRows[r];
+    const next = numberedRows[r + 1] ? numberedRows[r + 1].num : null;
+    // If sequence goes 10 → 1 → 12, the 1 should be 11
+    if (next !== null && curr.num < prev && next === prev + 2) {
+      lines[curr.i] = lines[curr.i].replace(/^(\s*)(\d+)/, (_, sp, n) => sp + String(prev + 1));
+    }
+  }
 
   // Remove obvious decorative/noise-only lines
   return lines
