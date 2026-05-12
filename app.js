@@ -1,21 +1,15 @@
-// ── Translation counter (counterapi.dev — free, no backend needed) ──
-const COUNTER_NS  = 'doctranslate-miami';
-const COUNTER_KEY = 'translations';
+// ── Translation counter (localStorage — upgradeable to global backend later) ──
+const COUNTER_KEY = 'doctranslate_count';
 
-async function fetchCounter() {
-  try {
-    const res  = await fetch(`https://api.counterapi.dev/v1/${COUNTER_NS}/${COUNTER_KEY}`);
-    const data = await res.json();
-    if (data && typeof data.count === 'number') showCounter(data.count);
-  } catch (_) { /* silently skip if API unavailable */ }
+function fetchCounter() {
+  const count = parseInt(localStorage.getItem(COUNTER_KEY) || '0');
+  if (count > 0) showCounter(count);
 }
 
-async function incrementCounter() {
-  try {
-    const res  = await fetch(`https://api.counterapi.dev/v1/${COUNTER_NS}/${COUNTER_KEY}/up`);
-    const data = await res.json();
-    if (data && typeof data.count === 'number') showCounter(data.count);
-  } catch (_) { /* silently skip */ }
+function incrementCounter() {
+  const count = parseInt(localStorage.getItem(COUNTER_KEY) || '0') + 1;
+  localStorage.setItem(COUNTER_KEY, String(count));
+  showCounter(count);
 }
 
 function showCounter(value) {
@@ -173,7 +167,7 @@ function loadFile(file) {
   reader.readAsDataURL(file);
 }
 
-// ── PDF loader — renders all pages to a single stitched canvas ──
+// ── PDF loader — extracts embedded text first; falls back to OCR for scanned PDFs ──
 async function loadPDF(file) {
   showProgress('Loading PDF…', 5);
   try {
@@ -184,13 +178,41 @@ async function loadPDF(file) {
     const ab  = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: ab }).promise;
     const totalPages = pdf.numPages;
-    const renderPages = Math.min(totalPages, 8); // cap at 8 pages
+    const renderPages = Math.min(totalPages, 8);
 
+    // ── Pass 1: try direct text extraction (handles multi-column layouts correctly) ──
+    const pageTexts = [];
+    let hasRealText = false;
+    for (let p = 1; p <= renderPages; p++) {
+      updateProgress(`Extracting page ${p} of ${renderPages}…`, 5 + Math.round((p / renderPages) * 50));
+      const page        = await pdf.getPage(p);
+      const textContent = await page.getTextContent();
+      const pageText    = reconstructColumnarText(textContent, page);
+      if (pageText.replace(/\s/g, '').length > 20) hasRealText = true;
+      pageTexts.push(pageText);
+    }
+
+    if (hasRealText) {
+      // Use extracted text directly — skip OCR entirely
+      capturedTextDirect = pageTexts.join('\n\n').trim();
+      document.getElementById('previewImg').style.display  = 'none';
+      const pageNote = totalPages > renderPages
+        ? ` (first ${renderPages} of ${totalPages} pages)`
+        : ` · ${totalPages} page${totalPages > 1 ? 's' : ''}`;
+      document.getElementById('previewLabel').textContent = `✓ PDF Loaded: ${file.name}${pageNote}`;
+      document.getElementById('previewWrap').style.display = 'block';
+      document.getElementById('processBtn').disabled = false;
+      hideProgress();
+      return;
+    }
+
+    // ── Pass 2 fallback: render to canvas + OCR (scanned / image-only PDFs) ──
+    updateProgress('No embedded text — switching to OCR…', 55);
     const rendered = [];
     for (let p = 1; p <= renderPages; p++) {
-      updateProgress(`Rendering page ${p} of ${renderPages}…`, 5 + Math.round((p / renderPages) * 35));
+      updateProgress(`Rendering page ${p} of ${renderPages}…`, 55 + Math.round((p / renderPages) * 35));
       const page = await pdf.getPage(p);
-      const vp   = page.getViewport({ scale: 1.8 }); // 1.8x = good OCR quality without huge memory
+      const vp   = page.getViewport({ scale: 1.8 });
       const c    = document.createElement('canvas');
       c.width    = vp.width;
       c.height   = vp.height;
@@ -198,9 +220,8 @@ async function loadPDF(file) {
       rendered.push(c);
     }
 
-    // Stitch pages vertically
     const totalW = Math.max(...rendered.map(c => c.width));
-    const totalH = rendered.reduce((h, c) => h + c.height + 20, 0); // 20px gap between pages
+    const totalH = rendered.reduce((h, c) => h + c.height + 20, 0);
     const combined = document.getElementById('captureCanvas');
     combined.width  = totalW;
     combined.height = totalH;
@@ -211,14 +232,75 @@ async function loadPDF(file) {
     for (const c of rendered) { ctx.drawImage(c, 0, y); y += c.height + 20; }
 
     capturedDataUrl = preprocessImage(combined);
-    const pageNote = totalPages > renderPages ? ` (first ${renderPages} of ${totalPages} pages)` : ` · ${totalPages} page${totalPages > 1 ? 's' : ''}`;
-    showPreview(capturedDataUrl, `✓ PDF Loaded: ${file.name}${pageNote}`);
+    const pageNote = totalPages > renderPages
+      ? ` (first ${renderPages} of ${totalPages} pages)`
+      : ` · ${totalPages} page${totalPages > 1 ? 's' : ''}`;
+    showPreview(capturedDataUrl, `✓ PDF Loaded (OCR): ${file.name}${pageNote}`);
     document.getElementById('processBtn').disabled = false;
     hideProgress();
   } catch (e) {
     hideProgress();
     showError('Could not load PDF: ' + e.message);
   }
+}
+
+// ── Column-aware PDF text reconstruction ──
+// Reads text items with their X/Y positions, detects two-column layouts,
+// and reads left column top→bottom then right column top→bottom.
+function reconstructColumnarText(textContent, page) {
+  const items = textContent.items.filter(item => item.str && item.str.trim());
+  if (!items.length) return '';
+
+  const viewport = page.getViewport({ scale: 1 });
+  const midX     = viewport.width / 2;
+  const Y_SNAP   = 4; // px tolerance to group items onto the same line
+
+  // Bucket items into lines by snapped Y coordinate
+  const lineMap = new Map();
+  for (const item of items) {
+    const x   = item.transform[4];
+    const raw = item.transform[5];
+    const y   = Math.round(raw / Y_SNAP) * Y_SNAP;
+
+    let key = null;
+    for (const k of lineMap.keys()) {
+      if (Math.abs(k - y) <= Y_SNAP) { key = k; break; }
+    }
+    if (key === null) { key = y; lineMap.set(key, []); }
+    lineMap.get(key).push({ x, str: item.str });
+  }
+
+  // Top→bottom (PDF y axis is bottom-up, so descending y = top of page first)
+  const sortedYs = [...lineMap.keys()].sort((a, b) => b - a);
+
+  // Detect two-column layout: both halves must each have meaningful item counts
+  const xPositions = items.map(i => i.transform[4]);
+  const leftCount  = xPositions.filter(x => x < midX).length;
+  const rightCount = xPositions.filter(x => x >= midX).length;
+  const isTwoCols  = leftCount > 4 && rightCount > 4 &&
+                     Math.min(leftCount, rightCount) / Math.max(leftCount, rightCount) > 0.2;
+
+  if (isTwoCols) {
+    // Read entire left column, then entire right column
+    const leftLines  = [];
+    const rightLines = [];
+    for (const y of sortedYs) {
+      const row   = lineMap.get(y).sort((a, b) => a.x - b.x);
+      const left  = row.filter(i => i.x < midX).map(i => i.str).join('').trim();
+      const right = row.filter(i => i.x >= midX).map(i => i.str).join('').trim();
+      if (left)  leftLines.push(left);
+      if (right) rightLines.push(right);
+    }
+    return [...leftLines, '', ...rightLines].join('\n');
+  }
+
+  // Single column — just sort by position
+  const lines = [];
+  for (const y of sortedYs) {
+    const line = lineMap.get(y).sort((a, b) => a.x - b.x).map(i => i.str).join('').trim();
+    if (line) lines.push(line);
+  }
+  return lines.join('\n');
 }
 
 // ── DOCX loader — uses HTML output to preserve headings, lists, tables ──
@@ -540,6 +622,7 @@ async function processDocument() {
         else if (m.status === 'initializing tesseract')       updateProgress('Initializing…', 10);
         else if (m.status === 'loading language traineddata') updateProgress('Loading Language Data…', 20);
       },
+      tessedit_pageseg_mode: '1', // Auto with orientation detection — handles multi-column layouts
     });
     const rawText = result.data.text.trim();
     if (!rawText) {
