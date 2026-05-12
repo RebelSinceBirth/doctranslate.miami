@@ -150,6 +150,47 @@ header {
 }
 .hero-dots span.hl { color: var(--cyan); border-color: rgba(0,212,255,.3); }
 
+/* ── Translation counter ── */
+.translation-counter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 18px;
+}
+.counter-pulse {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan);
+  animation: pulse-glow 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1;   box-shadow: 0 0 6px var(--cyan); }
+  50%       { opacity: .45; box-shadow: 0 0 14px var(--cyan); }
+}
+.counter-num {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.35rem;
+  letter-spacing: 3px;
+  color: var(--cyan);
+  text-shadow: 0 0 18px var(--cyan-glow);
+  line-height: 1;
+}
+.counter-label {
+  font-size: 0.68rem;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1;
+}
+
+/* Pro mode counter overrides */
+body.pro-mode .counter-pulse { background: #6366f1; box-shadow: none; animation: none; }
+body.pro-mode .counter-num   { font-family: 'Inter', sans-serif; font-weight: 700; font-size: 1.1rem; letter-spacing: 0; color: #6366f1; text-shadow: none; }
+body.pro-mode .counter-label { letter-spacing: 0; text-transform: none; color: #64748b; }
+
 /* ── Main layout ── */
 main {
   width: 100%;

@@ -1,3 +1,34 @@
+// ── Translation counter (countapi.xyz — free, no backend needed) ──
+const COUNTER_NS  = 'doctranslate-miami';
+const COUNTER_KEY = 'translations';
+
+async function fetchCounter() {
+  try {
+    const res  = await fetch(`https://api.countapi.xyz/get/${COUNTER_NS}/${COUNTER_KEY}`);
+    const data = await res.json();
+    if (data && typeof data.value === 'number') showCounter(data.value);
+  } catch (_) { /* silently skip if API unavailable */ }
+}
+
+async function incrementCounter() {
+  try {
+    const res  = await fetch(`https://api.countapi.xyz/hit/${COUNTER_NS}/${COUNTER_KEY}`);
+    const data = await res.json();
+    if (data && typeof data.value === 'number') showCounter(data.value);
+  } catch (_) { /* silently skip */ }
+}
+
+function showCounter(value) {
+  const wrap = document.getElementById('counterWrap');
+  const num  = document.getElementById('counterNum');
+  if (!wrap || !num) return;
+  num.textContent = value.toLocaleString(); // formats 1234 → 1,234
+  wrap.style.display = 'flex';
+}
+
+// Load count on page load
+fetchCounter();
+
 // ── Font toggle ──
 let proMode = false;
 function toggleFont() {
@@ -489,6 +520,7 @@ async function processDocument() {
       document.getElementById('resultsWrap').style.display = 'block';
       document.getElementById('resultsWrap').scrollIntoView({ behavior: 'smooth' });
       setTimeout(hideProgress, 1000);
+      incrementCounter(); // ✦ count this translation
     } catch (err) {
       hideProgress();
       showError('Translation failed: ' + err.message);
@@ -530,6 +562,7 @@ async function processDocument() {
     document.getElementById('resultsWrap').style.display = 'block';
     document.getElementById('resultsWrap').scrollIntoView({ behavior: 'smooth' });
     setTimeout(hideProgress, 1000);
+    incrementCounter(); // ✦ count this translation
   } catch (err) {
     hideProgress();
     showError('Something went wrong: ' + err.message);
