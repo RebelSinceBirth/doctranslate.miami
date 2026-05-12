@@ -1,20 +1,20 @@
-// ── Translation counter (countapi.xyz — free, no backend needed) ──
+// ── Translation counter (counterapi.dev — free, no backend needed) ──
 const COUNTER_NS  = 'doctranslate-miami';
 const COUNTER_KEY = 'translations';
 
 async function fetchCounter() {
   try {
-    const res  = await fetch(`https://api.countapi.xyz/get/${COUNTER_NS}/${COUNTER_KEY}`);
+    const res  = await fetch(`https://api.counterapi.dev/v1/${COUNTER_NS}/${COUNTER_KEY}`);
     const data = await res.json();
-    if (data && typeof data.value === 'number') showCounter(data.value);
+    if (data && typeof data.count === 'number') showCounter(data.count);
   } catch (_) { /* silently skip if API unavailable */ }
 }
 
 async function incrementCounter() {
   try {
-    const res  = await fetch(`https://api.countapi.xyz/hit/${COUNTER_NS}/${COUNTER_KEY}`);
+    const res  = await fetch(`https://api.counterapi.dev/v1/${COUNTER_NS}/${COUNTER_KEY}/up`);
     const data = await res.json();
-    if (data && typeof data.value === 'number') showCounter(data.value);
+    if (data && typeof data.count === 'number') showCounter(data.count);
   } catch (_) { /* silently skip */ }
 }
 
